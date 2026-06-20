@@ -1,0 +1,138 @@
+
+
+this is my auth servuce now cache activation status and if other things you want
+
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { PassportStrategy } from '@nestjs/passport';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+import { AuthenticatedUser, JwtPayload } from './auth.types';
+
+@Injectable()
+export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+  constructor() {
+    super({
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ignoreExpiration: false,
+      secretOrKey:
+        process.env.JWT_ACCESS_TOKEN_SECRET ??
+        'dev-access-token-secret-change-me',
+    });
+  }
+
+  validate(payload: JwtPayload): AuthenticatedUser {
+    if (payload.tokenType !== 'access') {
+      throw new UnauthorizedException('Invalid token type for access endpoint');
+    }
+
+    return {
+      userId: payload.sub,
+      username: payload.username,
+      role: payload.role,
+    };
+  }
+}
+
+
+
+jwt strategy
+
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { PassportStrategy } from '@nestjs/passport';
+import { Request } from 'express';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+import { AuthService } from './auth.service';
+import { AuthenticatedUser, RefreshJwtPayload } from './auth.types';
+
+@Injectable()
+export class RefreshJwtStrategy extends PassportStrategy(
+  Strategy,
+  'jwt-refresh',
+) {
+  constructor(private readonly authService: AuthService) {
+    super({
+      passReqToCallback: true,
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ignoreExpiration: false,
+      secretOrKey:
+        process.env.JWT_REFRESH_TOKEN_SECRET ??
+        'dev-refresh-token-secret-change-me',
+    });
+  }
+
+  async validate(
+    request: Request,
+    payload: RefreshJwtPayload,
+  ): Promise<AuthenticatedUser> {
+    if (payload.tokenType !== 'refresh') {
+      throw new UnauthorizedException('Invalid token type for refresh endpoint');
+    }
+
+    const authorization = request.headers.authorization ?? '';
+    const [, refreshToken] = authorization.split(' ');
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Missing refresh token');
+    }
+
+    return this.authService.validateRefreshToken(payload.sub, refreshToken);
+  }
+}
+
+
+
+refresh jwt strategy
+
+now i want this funcitonaliyt on login and signup store the activaion status with any user additonal information now when a user send request
+
+we should decode its token search for that user info in redis and
+
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import Redis from 'ioredis';
+
+@Injectable()
+export class RedisService implements OnModuleDestroy {
+    private readonly redis: Redis;
+
+    constructor() {
+        this.redis = new Redis({
+            host: '127.0.0.1',
+            port: 6379,
+        });
+    }
+
+    getClient() {
+        return this.redis;
+    }
+
+    async onModuleDestroy() {
+        await this.redis.quit();
+    }
+}
+
+this is redis sevrice
+
+if found then ok other wise search in database
+
+now if user is not active , then don;t allow him to move forward throw error other wise let him logn
+
+also make an endpoint to refres the access token
+
+and on that endpoint hit and ask him to force login like send a code like the front en will understand and return to login page
+
+when access token expire send error to refresh the access token and when the endpoint hit of refresh reftesh both tokens
+
+and if the token we arre receiving expiry or other config depsn;t match with the one that is in our database
+
+then force him to logot and you can use additonal information like device id etc
+
+and also one thing
+
+user can login on multiple devices as well
+
+so  if refresh token that is being used is old
+
+it means maybe its stolen
+
+like if it doesn't matches with the one that is inside db
+
+so you understand my thing and give me updated code for all the files
